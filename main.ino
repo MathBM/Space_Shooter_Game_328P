@@ -1,3 +1,10 @@
+//! Archive Description.
+/*!
+* \author Matheus Barbi. M.
+* \since 26/02/2022
+* \version 1.0
+*/
+
 #include <LiquidCrystal.h>
 
 #define tst_bit(Y,bit_x)  (Y&(1<<bit_x)) 
@@ -11,7 +18,6 @@
 #define RtBT 6
 #define ShootBT 3
 #define PauseBT 2
-
 
 LiquidCrystal lcd (13, 12, 11, 10, 9, 8);
 
@@ -61,7 +67,9 @@ void loop()
         energy_points -= 0.25;
         lcd.clear();
         painel(13);
-      
+
+        // Movement
+
         if(!(tst_bit(PIND, UpBT)))
         {
             ship_position[1] = 0;
@@ -72,11 +80,17 @@ void loop()
         }
       	if(!(tst_bit(PIND, LtBT)))
         {
-            ship_position[0] -= 1;
+            if (ship_position[0] != 0)
+            {
+                ship_position[0] -= 1;
+            }
         }
         if(!(tst_bit(PIND, RtBT)))
         {
-            ship_position[0] += 1;
+            if (ship_position[0] != 12)
+            {
+                ship_position[0] += 1;
+            }
         }
         if(!(tst_bit(PIND, ShootBT)))
         {
@@ -86,6 +100,8 @@ void loop()
         }
         
         asteroid_position[0] -= 1;
+
+        // Movement //
 
         Draw(ship_position, 1);
         Draw(asteroid_position, 2);
@@ -123,25 +139,28 @@ void loop()
         
         // DEBUG
 
-        // Colisions
+        /// Colisions
 
         if((colisionShootAsteroid(shoot_position, asteroid_position) == 1) && (vshoot == true))
         {
             vshoot = false;
             shoot_position[0] = -1;
-            animationExplosion(asteroid_position, 3);
+            animationExplosion(asteroid_position);
             asteroid_position[0] = 12;
             asteroid_position[1] = random(0,2);
             points += 1;
         }
-        
+
         if (colisionShipAsteroid(ship_position, asteroid_position) == 1)
          {
-            animationExplosion(ship_position, 3);
+            animationExplosion(ship_position);
             lcd.clear();
             game = false;
          }
-        delay(100); // velocity
+
+        /// Colisions
+
+        delay(100); // Game Velocity
     }
     else
     {
@@ -168,13 +187,23 @@ void loop()
 
 }
 
+///! Draw Objects of Game in Screen.
+/*!
+    \param None.
+    \return None.
+*/
 void Draw(int position[2], int numb_char)
 {
     lcd.setCursor(position[0], position[1]);
     lcd.write(numb_char);
 }
 
-void animationExplosion(int position[2], int numb_char)
+///! Draw Explosion about Colisions of game.
+/*!
+    \param position array, create explosion in this position.
+    \return None.
+*/
+void animationExplosion(int position[2])
 {
     lcd.setCursor(position[0], position[1]);
     lcd.write(3);
@@ -182,9 +211,16 @@ void animationExplosion(int position[2], int numb_char)
     lcd.clear();
 }
 
+///! Change Game States for restart.
+/*!
+    \param None.
+    \param None.
+    \return None.
+*/
 void game_reset() 
 {
-    ship_position[0], ship_position[1] = 0;
+    ship_position[0] = 0; 
+    ship_position[1] = 0;
     asteroid_position[0] = 12;
     asteroid_position[1] = random(0, 2);
     points = 0;
@@ -192,6 +228,12 @@ void game_reset()
     game =true;
 }
 
+///! Creates Painel Of Game.
+/*!
+    \param positionx int, location x of painel.
+    \param None.
+    \return None.
+*/
 void painel (int positionx)
 {
     lcd.setCursor(positionx, 0);
@@ -200,7 +242,13 @@ void painel (int positionx)
     lcd.print(energy_points);
 }
 
-void finalScreen(char text[10]) // You Lse or You Win
+///! Creates End Screen of Game.
+/*!
+    \param text char, can be You Lse or You Win.
+    \param None.
+    \return None.
+*/
+void finalScreen(char text[10]) 
 {
     lcd.setCursor(9, 0);
     lcd.print("Pts:");
@@ -212,6 +260,12 @@ void finalScreen(char text[10]) // You Lse or You Win
     lcd.print("Press BT Shoot.");
 }
 
+///! Creates Initial Screen of Game.
+/*!
+    \param None.
+    \param None.
+    \return None.
+*/
 void initialScreen()
 {
     lcd.setCursor(0, 0);
@@ -220,18 +274,30 @@ void initialScreen()
     lcd.print("to Start Game.");
 }
 
+///! Crate Colision Shoot With Asteroid.
+/*!
+    \param position_ob1 array of position with 2 values.
+    \param position_ob2 array of position with 2 values.
+    \return one interger with value 1.
+*/
 int colisionShootAsteroid (int position_ob1[2], int position_ob2[2])
 {
     if (((position_ob1[0] == position_ob2[0]+1) && (position_ob1[1] == position_ob2[1])) || ((position_ob1[0] == position_ob2[0]) && (position_ob1[1] == position_ob2[1])))
-
     {
         return 1;
     }
    
 }
+
+///! Create Colision Ship With Asteroid.
+/*!
+    \param position_ob1 array of position with 2 values.
+    \param position_ob2 array of position with 2 values.
+    \return one interger with value 1.
+*/
 int colisionShipAsteroid(int position_ob1[2], int position_ob2[2])
 {
-    if ((position_ob1[0] == position_ob2[0]) && (position_ob1[1] == position_ob2[1]))
+    if ((position_ob1[1] == position_ob2[1]) && (position_ob1[0] == position_ob2[0]))
     {
         return 1;
     }
