@@ -35,6 +35,7 @@ byte shoot[8] = {B00000,B00000,B00000,B00111,B00111,B00000,B00000,B00000};
 // Auxilary Controle variables.
 bool gamestart = false;
 bool flag_first = true;
+char pause = 0x00;
 bool vshoot = false;
 bool vbattery = false;
 bool win = false;
@@ -44,10 +45,22 @@ int velocity = 0;
 int recpoints = 0;
 int dropchance = 0;
 
+
+ISR(INT0_vect)
+{
+    cpl_bit(pause, 0);
+}
+
+
 void setup()
 {
-    DDRD = 0b00000011; // REGS IN --> 0 Out --> 1)
-	PORTD = 0b11111100; // pull Down
+    DDRD = 0b00000111; // REGS IN --> 0 Out --> 1)
+	PORTD = 0b11111000; // pull Down
+
+    EICRA |=  (1<< ISC01) | (1<< ISC00);
+    EIMSK |= (1<<INT0);
+
+    sei();
 
     asteroid_position[0] = 12;
     asteroid_position[1] = random(0, 2);
@@ -72,6 +85,16 @@ void setup()
 
 void loop()
 {
+  while(tst_bit(pause, 0))
+  {
+   	lcd.setCursor(0, 0);
+    lcd.print("GAME PAUSED");
+    lcd.setCursor(0, 1);
+    lcd.print("PRESS PAUSE BT");
+    delay(500);
+    lcd.clear();
+    
+  }
   if(gamestart)
     {
         energy_points -= 0.20;
