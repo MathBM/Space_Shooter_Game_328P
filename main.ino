@@ -26,6 +26,7 @@ float energy_points = 0;
 int velocity = 0;
 int ship_position[2], asteroid_position[2], energy_position[2], shoot_position[2] = {0, 0};
 
+// Char of objects
 byte space_ship[8] ={B11000, B01100, B01110, B01111, B01111, B01110, B01100, B11000};
 byte asteroid[8]= {B00000, B00100, B01110, B10111, B11101, B01110, B00100, B00000};
 byte explosion[8] = {B10001, B10101, B01010, B10100, B00101, B01010, B10101, B10001};
@@ -33,7 +34,7 @@ byte energy[8] = {B01110,B11011,B10001,B10101,B10101,B10101,B10001,B11111};
 byte shoot[8] = {B00000,B00000,B00000,B00111,B00111,B00000,B00000,B00000};
 
 // Auxilary Controle variables.
-bool game = false;
+bool gamestart = false;
 bool flag_first = true;
 bool vshoot = false;
 
@@ -43,7 +44,10 @@ void setup()
 	PORTD = 0b11111100; // pull Down
 
     asteroid_position[0] = 12;
+    asteroid_position[1] = random(0, 2);
+
     shoot_position[0] = -1;
+
     energy_points = 100;
     velocity = 100;
 
@@ -56,17 +60,17 @@ void setup()
     lcd.begin(16,2);
     lcd.clear();
 
-    Serial.begin(9600);
+    //Serial.begin(9600);
 
 }
 
 void loop()
 {
-    if(game)
+    if(gamestart)
     {
         energy_points -= 0.25;
         lcd.clear();
-        painel(13);
+        painel(12);
 
         // Movement
 
@@ -78,19 +82,13 @@ void loop()
         {
             ship_position[1] = 1;
         }
-      	if(!(tst_bit(PIND, LtBT)))
+      	if((!(tst_bit(PIND, LtBT))) && (ship_position[0] != 0))
         {
-            if (ship_position[0] != 0)
-            {
-                ship_position[0] -= 1;
-            }
+            ship_position[0] -= 1;
         }
-        if(!(tst_bit(PIND, RtBT)))
+        if((!(tst_bit(PIND, RtBT))) && (ship_position[0] != 12))
         {
-            if (ship_position[0] != 12)
-            {
-                ship_position[0] += 1;
-            }
+            ship_position[0] += 1;
         }
         if(!(tst_bit(PIND, ShootBT)))
         {
@@ -102,9 +100,9 @@ void loop()
         asteroid_position[0] -= 1;
 
         // Movement //
-
-        Draw(ship_position, 1);
         Draw(asteroid_position, 2);
+        Draw(ship_position, 1);
+        
 
         if (vshoot)
         {
@@ -112,7 +110,7 @@ void loop()
           shoot_position[0] += 1;	
         }
 
-        if(asteroid_position[0] == 0)
+        if(asteroid_position[0] == -1)
         {
            asteroid_position[0] = 12;
            asteroid_position[1] = random(0,2);
@@ -122,22 +120,6 @@ void loop()
             vshoot = false;
             shoot_position[0] = -1;
         }
-
-        // DEBUG
-        Serial.print("Ship Position x: ");
-        Serial.print(ship_position[0], DEC);
-        Serial.println("");
-        Serial.print("Ship Position y: ");
-        Serial.print(ship_position[1], DEC);
-        Serial.println("");
-        Serial.print("Asteroid Position x: ");
-        Serial.print(asteroid_position[0], DEC);
-        Serial.println("");
-        Serial.print("Asteroid Position y: ");
-        Serial.print(asteroid_position[1], DEC);
-      	Serial.println("");
-        
-        // DEBUG
 
         /// Colisions
 
@@ -153,14 +135,15 @@ void loop()
 
         if (colisionShipAsteroid(ship_position, asteroid_position) == 1)
          {
+            delay(100);
             animationExplosion(ship_position);
             lcd.clear();
-            game = false;
+            gamestart = false;
          }
-
+        
         /// Colisions
 
-        delay(100); // Game Velocity
+        delay(200); // Game Velocity
     }
     else
     {
@@ -225,7 +208,7 @@ void game_reset()
     asteroid_position[1] = random(0, 2);
     points = 0;
     energy_points = 100;
-    game =true;
+    gamestart =true;
 }
 
 ///! Creates Painel Of Game.
