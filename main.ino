@@ -19,6 +19,16 @@
 #define ShootBT 3
 #define PauseBT 2
 
+// Auxilary Controle variables.
+#define gamestart 0
+#define flag_first 1
+#define vshoot 2
+#define vbattery 3
+#define win 4
+#define pause 5
+
+char flag = 0x00000010;
+
 LiquidCrystal lcd (13, 12, 11, 10, 9, 8);
 
 int points = 0;
@@ -32,23 +42,14 @@ byte explosion[8] = {B10001, B10101, B01010, B10100, B00101, B01010, B10101, B10
 byte energy[8] = {B01110,B11011,B10001,B10101,B10101,B10101,B10001,B11111};
 byte shoot[8] = {B00000,B00000,B00000,B00111,B00111,B00000,B00000,B00000};
 
-// Auxilary Controle variables.
-bool gamestart = false;
-bool flag_first = true;
-char pause = 0x00;
-bool vshoot = false;
-bool vbattery = false;
-bool win = false;
-
 // Difficult variables
 int velocity = 0;
 int recpoints = 0;
 int dropchance = 0;
 
-
 ISR(INT0_vect)
 {
-    cpl_bit(pause, 0);
+    cpl_bit(flag, pause);
 }
 
 
@@ -85,7 +86,7 @@ void setup()
 
 void loop()
 {
-  while(tst_bit(pause, 0))
+  while(tst_bit(flag, pause))
   {
    	lcd.setCursor(0, 0);
     lcd.print("GAME PAUSED");
@@ -95,13 +96,13 @@ void loop()
     lcd.clear();
     
   }
-  if(gamestart)
+  if(tst_bit(flag, gamestart))
     {
         energy_points -= 0.20;
         if (energy_points <= 0)
             {
                 animationExplosion(ship_position);
-                gamestart = false;
+                clr_bit(flag, gamestart);
             }
 
         lcd.clear();
@@ -129,7 +130,7 @@ void loop()
         {
             shoot_position[0] = (ship_position[0]+1);
             shoot_position[1] = ship_position[1];
-            vshoot = true;
+            set_bit(flag, vshoot);
         }
         
         asteroid_position[0] -= 1;
@@ -139,7 +140,7 @@ void loop()
         Draw(ship_position, 1);
         
 
-        if (vshoot)
+        if (tst_bit(flag, vshoot))
         {
           Draw(shoot_position, 5);
           shoot_position[0] += 1;	
@@ -152,7 +153,7 @@ void loop()
         }
         if (shoot_position[0] == 12)
         {
-            vshoot = false;
+            clr_bit(flag, vshoot);
             shoot_position[0] = -1;
         }
 
@@ -164,12 +165,12 @@ void loop()
             //delay(100);
             animationExplosion(ship_position);
             lcd.clear();
-            gamestart = false;
+            clr_bit(flag, gamestart);
          }
 
-        if((colisionShootAsteroid(shoot_position, asteroid_position) == 1) && (vshoot == true))
+        if((colisionShootAsteroid(shoot_position, asteroid_position) == 1) && (tst_bit(flag, vshoot)))
         {
-            vshoot = false;
+            clr_bit(flag, vshoot);
             shoot_position[0] = -1;
             animationExplosion(asteroid_position);
             asteroid_position[0] = 12;
@@ -177,17 +178,17 @@ void loop()
             points += 1;
             if (points >= 2)
             {
-                win = true;
-                gamestart = false;
+                set_bit(flag, win);
+                clr_bit(flag, gamestart);
             }
         }
         /// Colisions
 
-        if (!vbattery)
+        if (!(tst_bit(flag, vbattery)))
         {
             if(random(0, 101) > dropchance)
             {
-                vbattery = true;
+                set_bit(flag, vbattery);
                 energy_position[0] = 12;
                 energy_position[1] = random(0, 2);
 
@@ -199,7 +200,7 @@ void loop()
             Draw(energy_position, 4);
             if (colisionShootAsteroid(ship_position, energy_position) == 1)
             {
-                vbattery = false;
+                clr_bit(flag, vbattery);
                 energy_position[0] = -2;
                 energy_points += 40;
             }
@@ -208,19 +209,19 @@ void loop()
     }
     else
     {
-        if (flag_first == 1)
+        if (!tst_bit(flag, flag_first))
         {
              while(tst_bit(PIND, ShootBT))
             {
                 initialScreen();
             }
-            flag_first = false;
+            cpl_bit(flag, flag_first);
           	lcd.clear();
             game_reset();
         }
         else
         {
-            if (win)
+            if (tst_bit(flag, win))
             {
                 velocity -= 50;
                 recpoints -= 10;
@@ -283,9 +284,9 @@ void game_reset()
     asteroid_position[0] = 12;
     asteroid_position[1] = random(0, 2);
     points = 0;
-  	win = false;
-    gamestart =true;
-  
+  	set_bit(flag, gamestart);
+  	clr_bit(flag, win);
+    
 }
 
 ///! Creates Painel Of Game.
