@@ -60,8 +60,6 @@ void setup()
     lcd.begin(16,2);
     lcd.clear();
 
-    //Serial.begin(9600);
-
 }
 
 void loop()
@@ -73,7 +71,7 @@ void loop()
         painel(12);
 
         // Movement
-
+        
         if(!(tst_bit(PIND, UpBT)))
         {
             ship_position[1] = 0;
@@ -98,8 +96,8 @@ void loop()
         }
         
         asteroid_position[0] -= 1;
-
         // Movement //
+
         Draw(asteroid_position, 2);
         Draw(ship_position, 1);
         
@@ -123,6 +121,15 @@ void loop()
 
         /// Colisions
 
+
+        if ((ship_position[1] == asteroid_position[1]) && (ship_position[0] == asteroid_position[0]))
+         {
+            //delay(100);
+            animationExplosion(ship_position);
+            lcd.clear();
+            gamestart = false;
+         }
+
         if((colisionShootAsteroid(shoot_position, asteroid_position) == 1) && (vshoot == true))
         {
             vshoot = false;
@@ -132,18 +139,9 @@ void loop()
             asteroid_position[1] = random(0,2);
             points += 1;
         }
-
-        if (colisionShipAsteroid(ship_position, asteroid_position) == 1)
-         {
-            delay(100);
-            animationExplosion(ship_position);
-            lcd.clear();
-            gamestart = false;
-         }
-        
         /// Colisions
 
-        delay(200); // Game Velocity
+        delay(velocity); // Game Velocity
     }
     else
     {
@@ -274,6 +272,7 @@ int colisionShootAsteroid (int position_ob1[2], int position_ob2[2])
 
 ///! Create Colision Ship With Asteroid.
 /*!
+    DON'T USE, if use this fun create a delay in program and colision don't work.
     \param position_ob1 array of position with 2 values.
     \param position_ob2 array of position with 2 values.
     \return one interger with value 1.
