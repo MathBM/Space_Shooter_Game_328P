@@ -23,7 +23,6 @@ LiquidCrystal lcd (13, 12, 11, 10, 9, 8);
 
 int points = 0;
 float energy_points = 0;
-int velocity = 0;
 int ship_position[2], asteroid_position[2], energy_position[2], shoot_position[2] = {0, 0};
 
 // Char of objects
@@ -37,6 +36,13 @@ byte shoot[8] = {B00000,B00000,B00000,B00111,B00111,B00000,B00000,B00000};
 bool gamestart = false;
 bool flag_first = true;
 bool vshoot = false;
+bool vbattery = false;
+bool win = false;
+
+// Difficult variables
+int velocity = 0;
+int recpoints = 0;
+int dropchance = 0;
 
 void setup()
 {
@@ -49,7 +55,9 @@ void setup()
     shoot_position[0] = -1;
 
     energy_points = 100;
-    velocity = 100;
+    velocity = 300;
+    recpoints = 40;
+    dropchance = 50;
 
     lcd.createChar(1, space_ship);
     lcd.createChar(2, asteroid);
@@ -64,14 +72,20 @@ void setup()
 
 void loop()
 {
-    if(gamestart)
+  if(gamestart)
     {
-        energy_points -= 0.25;
+        energy_points -= 0.20;
+        if (energy_points <= 0)
+            {
+                animationExplosion(ship_position);
+                gamestart = false;
+            }
+
         lcd.clear();
         painel(12);
 
         // Movement
-        
+
         if(!(tst_bit(PIND, UpBT)))
         {
             ship_position[1] = 0;
@@ -138,9 +152,35 @@ void loop()
             asteroid_position[0] = 12;
             asteroid_position[1] = random(0,2);
             points += 1;
+            if (points >= 2)
+            {
+                win = true;
+                gamestart = false;
+            }
         }
         /// Colisions
 
+        if (!vbattery)
+        {
+            if(random(0, 101) > dropchance)
+            {
+                vbattery = true;
+                energy_position[0] = 12;
+                energy_position[1] = random(0, 2);
+
+            }
+        }
+        else
+        {
+            energy_position[0] -= 1;
+            Draw(energy_position, 4);
+            if (colisionShootAsteroid(ship_position, energy_position) == 1)
+            {
+                vbattery = false;
+                energy_position[0] = -2;
+                energy_points += 40;
+            }
+        }
         delay(velocity); // Game Velocity
     }
     else
@@ -157,7 +197,22 @@ void loop()
         }
         else
         {
-            finalScreen("You Lse");
+            if (win)
+            {
+                velocity -= 50;
+                recpoints -= 10;
+                dropchance += 10; 
+                energy_points = 70;
+               	finalScreen("You win");
+            }
+            else
+            {
+              	velocity = 300;
+                recpoints = 40 ;
+                dropchance = 50; 
+                energy_points = 100;
+                finalScreen("You Lse");
+            }
         }
 
         if(!(tst_bit(PIND, ShootBT)))
@@ -205,8 +260,9 @@ void game_reset()
     asteroid_position[0] = 12;
     asteroid_position[1] = random(0, 2);
     points = 0;
-    energy_points = 100;
+  	win = false;
     gamestart =true;
+  
 }
 
 ///! Creates Painel Of Game.
@@ -255,7 +311,7 @@ void initialScreen()
     lcd.print("to Start Game.");
 }
 
-///! Crate Colision Shoot With Asteroid.
+///! Crate Colision Shoot With Asteroid and Ship with Battery.
 /*!
     \param position_ob1 array of position with 2 values.
     \param position_ob2 array of position with 2 values.
@@ -272,7 +328,7 @@ int colisionShootAsteroid (int position_ob1[2], int position_ob2[2])
 
 ///! Create Colision Ship With Asteroid.
 /*!
-    DON'T USE, if use this fun create a delay in program and colision don't work.
+    **DON'T USE**, if you use this func, you are create a delay in program and colision does't work.
     \param position_ob1 array of position with 2 values.
     \param position_ob2 array of position with 2 values.
     \return one interger with value 1.
