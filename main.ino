@@ -46,22 +46,42 @@ byte shoot[8] = {B00000,B00000,B00000,B00111,B00111,B00000,B00000,B00000};
 int velocity = 0;
 int recpoints = 0;
 int dropchance = 0;
+int temp_aux = 0;
+bool disp_up = 0;
 
 ISR(INT0_vect)
 {
     cpl_bit(flag, pause);
 }
 
+ISR(TIMER1_COMPA_vect)
+{
+    temp_aux += 1;
+
+    if (temp_aux == 4)
+    {
+        disp_up = 1;
+    }
+    
+}
+
 
 void setup()
 {
+    //cli();
+
     DDRD = 0b00000111; // REGS IN --> 0 Out --> 1)
 	PORTD = 0b11111000; // pull Down
 
     EICRA |=  (1<< ISC01) | (1<< ISC00);
     EIMSK |= (1<<INT0);
 
-    sei();
+    TCCR1A = 0;
+    TCCR1B = 0;
+    TCCR1B |= (1 << WGM12)|(1<<CS10)|(1 << CS12);
+    OCR1A = 35400;
+
+    //sei();
 
     asteroid_position[0] = 12;
     asteroid_position[1] = random(0, 2);
@@ -136,9 +156,11 @@ void loop()
         asteroid_position[0] -= 1;
         // Movement //
 
-        Draw(asteroid_position, 2);
-        Draw(ship_position, 1);
-        
+        if(disp_up)
+        {
+            Draw(asteroid_position, 2);
+            Draw(ship_position, 1);
+        }
 
         if (tst_bit(flag, vshoot))
         {
@@ -158,9 +180,7 @@ void loop()
         }
 
         /// Colisions
-
-
-        if ((ship_position[1] == asteroid_position[1]) && (ship_position[0] == asteroid_position[0]))
+        if (colisionShipAsteroid(ship_position, asteroid) == 1)
          {
             //delay(100);
             animationExplosion(ship_position);
@@ -205,7 +225,7 @@ void loop()
                 energy_points += 40;
             }
         }
-        delay(velocity); // Game Velocity
+        //delay(velocity); // Game Velocity
     }
     else
     {
@@ -218,6 +238,7 @@ void loop()
             cpl_bit(flag, flag_first);
           	lcd.clear();
             game_reset();
+            TIMSK1 |= (1 << OCIE1A);
         }
         else
         {
@@ -352,7 +373,6 @@ int colisionShootAsteroid (int position_ob1[2], int position_ob2[2])
 
 ///! Create Colision Ship With Asteroid.
 /*!
-    **DON'T USE**, if you use this func, you are create a delay in program and colision does't work.
     \param position_ob1 array of position with 2 values.
     \param position_ob2 array of position with 2 values.
     \return one interger with value 1.
