@@ -2,7 +2,7 @@
 /*!
 * \author Matheus Barbi. M.
 * \since 26/02/2022
-* \version 1.0
+* \version 1.35
 */
 
 #include <LiquidCrystal.h>
@@ -12,6 +12,10 @@
 #define clr_bit(Y, bit_x) (Y&=~(1<<bit_x))
 #define cpl_bit(Y, bit_x) (Y^=(1<<bit_x))
 
+///! Macros Control Variables
+/*!
+   Buttons  
+*/
 #define UpBT 5
 #define DownBT 4
 #define LtBT 7
@@ -19,253 +23,289 @@
 #define ShootBT 3
 #define PauseBT 2
 
-// Auxilary Controle variables.
+/*!
+   Gama Status
+*/
 #define gamestart 0
 #define flag_first 1
 #define vshoot 2
 #define vbattery 3
 #define win 4
 #define pause 5
+#define flag_up 6
 
+///! Auxiliary Control Variables
+/*!
+   flags status
+*/
 char flag = 0x00000010;
 
-LiquidCrystal lcd (13, 12, 11, 10, 9, 8);
-
+/*!
+   Game Variables
+*/
 int points = 0;
-float energy_points = 0;
+float energy_points = 100;
 int ship_position[2], asteroid_position[2], energy_position[2], shoot_position[2] = {0, 0};
 
-// Char of objects
+/*!
+   Difficult Variables
+*/
+int velocity = 5000;
+int recpoints = 0;
+int dropchance = 0;
+int points_to_win = 2;
+
+///! Screen Objects
+/*!
+   Objects Vectors
+*/
 byte space_ship[8] ={B11000, B01100, B01110, B01111, B01111, B01110, B01100, B11000};
 byte asteroid[8]= {B00000, B00100, B01110, B10111, B11101, B01110, B00100, B00000};
 byte explosion[8] = {B10001, B10101, B01010, B10100, B00101, B01010, B10101, B10001};
 byte energy[8] = {B01110,B11011,B10001,B10101,B10101,B10101,B10001,B11111};
 byte shoot[8] = {B00000,B00000,B00000,B00111,B00111,B00000,B00000,B00000};
 
-// Difficult variables
-int velocity = 0;
-int recpoints = 0;
-int dropchance = 0;
-int temp_aux = 0;
-bool disp_up = 0;
+LiquidCrystal lcd (13, 12, 11, 10, 9, 8);
 
 ISR(INT0_vect)
 {
-    cpl_bit(flag, pause);
+  cpl_bit(flag, pause);
+  TIMSK1 |= (1 << OCIE1A);
+  
+}
+
+ISR(INT1_vect)
+{
+  set_bit(flag, vshoot);
+  shoot_position[0] = (ship_position[0]+1);
+  shoot_position[1] = ship_position[1];
 }
 
 ISR(TIMER1_COMPA_vect)
 {
-    temp_aux += 1;
-
-    if (temp_aux == 4)
+  lcd.clear(); 
+  if(tst_bit(flag, pause))
+  {
+    TIMSK1 &= (0 << OCIE1A);
+   	lcd.setCursor(0, 0);
+    lcd.print("GAME PAUSED");
+    lcd.setCursor(0, 1);
+    lcd.print("PRESS PAUSE BT");
+  }
+  else
+  {
+    Draw(asteroid_position, 2);
+    Draw(ship_position, 1);
+    painel(12);
+    
+    energy_points -= 0.20;
+    
+    if (energy_points <= 0)
     {
-        disp_up = 1;
+      animationExplosion(ship_position);
+      clr_bit(flag, gamestart);
+    }
+    if (tst_bit(flag, vshoot))
+    {
+      Draw(shoot_position, 5);	
     }
     
+    asteroid_position[0] -= 1;
+    
+    if (tst_bit(flag, vshoot))
+    {
+      shoot_position[0] += 1;	
+    }
+    
+    if (colisionShipAsteroid(ship_position, asteroid_position))
+    { 
+      for (int i = 0; i<= 50; i++)
+      {
+      	animationExplosion(ship_position);
+      }
+      clr_bit(flag, gamestart);
+      lcd.clear();
+    }
+
+    if((colisionShootAsteroid(shoot_position, asteroid_position)) && (tst_bit(flag, vshoot)))
+    {
+      clr_bit(flag, vshoot);
+      shoot_position[0] = -1;
+      animationExplosion(asteroid_position);
+      asteroid_position[0] = 12;
+      asteroid_position[1] = random(0,2);
+      points += 1;
+      if (points >= points_to_win)
+      {
+        set_bit(flag, win);
+        clr_bit(flag, gamestart);
+        lcd.clear();
+      }
+    }
+    energy_position[0] -= 1;
+    
+    Draw(energy_position, 4);
+    
+    if (colisionShootAsteroid(ship_position, energy_position))
+    {
+      clr_bit(flag, vbattery);
+      energy_position[0] = -2;
+      energy_points += 40;
+    }
+
+  }  
 }
-
-
 void setup()
 {
-    //cli();
+  cli();
 
-    DDRD = 0b00000111; // REGS IN --> 0 Out --> 1)
-	PORTD = 0b11111000; // pull Down
+  // Configura REGS do PORTD como saída ou entrada. 1 -> OUT, 0-> IN
+  DDRD = 0b00000011; 
+  PORTD =0b11111100; // Habilita Resistores de Pull-Down Interno
 
-    EICRA |=  (1<< ISC01) | (1<< ISC00);
-    EIMSK |= (1<<INT0);
+  
+  ///! Configuração dos Registradores para Interrupção.
+  /*!
+    INT 0
+  */
+  EICRA |=  (1<< ISC01); // Falling Mode
+  EIMSK |= (1<<INT0);
 
-    TCCR1A = 0;
-    TCCR1B = 0;
-    TCCR1B |= (1 << WGM12)|(1<<CS10)|(1 << CS12);
-    OCR1A = 35400;
+  /*!
+    INT 1
+  */
+  EICRA |=  (1<< ISC11); // Falling Mode
+  EIMSK |= (1<<INT1);
 
-    //sei();
+  /*!
+    T1 CTC MODE, 256.
+  */
+  TCCR1A = 0;
+  TCCR1B = 0;
+  TCCR1B |= (1 << WGM12)|(1 << CS12);
+  OCR1A = velocity;
 
-    asteroid_position[0] = 12;
-    asteroid_position[1] = random(0, 2);
+  asteroid_position[0] = 12;
+  asteroid_position[1] = random(0, 2);
 
-    shoot_position[0] = -1;
+  shoot_position[0] = -1;
 
-    energy_points = 100;
-    velocity = 300;
-    recpoints = 40;
-    dropchance = 50;
+  energy_points = 100;
+  recpoints = 40;
+  dropchance = 50;
 
-    lcd.createChar(1, space_ship);
-    lcd.createChar(2, asteroid);
-    lcd.createChar(3, explosion);
-    lcd.createChar(4, energy);
-    lcd.createChar(5, shoot);
+  lcd.createChar(1, space_ship);
+  lcd.createChar(2, asteroid);
+  lcd.createChar(3, explosion);
+  lcd.createChar(4, energy);
+  lcd.createChar(5, shoot);
 
-    lcd.begin(16,2);
-    lcd.clear();
+  lcd.begin(16,2);
+  lcd.clear();
+  sei();
 
 }
 
 void loop()
 {
-  while(tst_bit(flag, pause))
-  {
-   	lcd.setCursor(0, 0);
-    lcd.print("GAME PAUSED");
-    lcd.setCursor(0, 1);
-    lcd.print("PRESS PAUSE BT");
-    delay(500);
-    lcd.clear();
-    
-  }
   if(tst_bit(flag, gamestart))
+  {
+    
+    // Button Read
+    if(!(tst_bit(PIND, UpBT)))
     {
-        energy_points -= 0.20;
-        if (energy_points <= 0)
-            {
-                animationExplosion(ship_position);
-                clr_bit(flag, gamestart);
-            }
+      ship_position[1] = 0;
+    }
+    if(!(tst_bit(PIND, DownBT)))
+    {
+      ship_position[1] = 1;
+    }
+    if((!(tst_bit(PIND, LtBT))) && (ship_position[0] != 0))
+    {
+      ship_position[0] -= 1;
+    }
+    if((!(tst_bit(PIND, RtBT))) && (ship_position[0] != 12))
+    {
+      ship_position[0] += 1;
+    }
+    if(!(tst_bit(PIND, ShootBT)))
+    {
+      set_bit(flag, vshoot);
+      shoot_position[0] = (ship_position[0]+1);
+      shoot_position[1] = ship_position[1];
+    }
+    
+    if(asteroid_position[0] == -1)
+    {
+      asteroid_position[0] = 12;
+      asteroid_position[1] = random(0,2);
+    }
+    if (shoot_position[0] == 12)
+    {
+      clr_bit(flag, vshoot);
+      shoot_position[0] = -1;
+    }
+    
+    if (!(tst_bit(flag, vbattery)))
+    {
+      if(random(0, 101) > dropchance)
+      {
+        set_bit(flag, vbattery);
+        energy_position[0] = 12;
+        energy_position[1] = random(0, 2);
+      }
+    }
 
-        lcd.clear();
-        painel(12);
-
-        // Movement
-
-        if(!(tst_bit(PIND, UpBT)))
-        {
-            ship_position[1] = 0;
-        }
-        if(!(tst_bit(PIND, DownBT)))
-        {
-            ship_position[1] = 1;
-        }
-      	if((!(tst_bit(PIND, LtBT))) && (ship_position[0] != 0))
-        {
-            ship_position[0] -= 1;
-        }
-        if((!(tst_bit(PIND, RtBT))) && (ship_position[0] != 12))
-        {
-            ship_position[0] += 1;
-        }
-        if(!(tst_bit(PIND, ShootBT)))
-        {
-            shoot_position[0] = (ship_position[0]+1);
-            shoot_position[1] = ship_position[1];
-            set_bit(flag, vshoot);
-        }
-        
-        asteroid_position[0] -= 1;
-        // Movement //
-
-        if(disp_up)
-        {
-            Draw(asteroid_position, 2);
-            Draw(ship_position, 1);
-        }
-
-        if (tst_bit(flag, vshoot))
-        {
-          Draw(shoot_position, 5);
-          shoot_position[0] += 1;	
-        }
-
-        if(asteroid_position[0] == -1)
-        {
-           asteroid_position[0] = 12;
-           asteroid_position[1] = random(0,2);
-        }
-        if (shoot_position[0] == 12)
-        {
-            clr_bit(flag, vshoot);
-            shoot_position[0] = -1;
-        }
-
-        /// Colisions
-        if (colisionShipAsteroid(ship_position, asteroid) == 1)
-         {
-            //delay(100);
-            animationExplosion(ship_position);
-            lcd.clear();
-            clr_bit(flag, gamestart);
-         }
-
-        if((colisionShootAsteroid(shoot_position, asteroid_position) == 1) && (tst_bit(flag, vshoot)))
-        {
-            clr_bit(flag, vshoot);
-            shoot_position[0] = -1;
-            animationExplosion(asteroid_position);
-            asteroid_position[0] = 12;
-            asteroid_position[1] = random(0,2);
-            points += 1;
-            if (points >= 2)
-            {
-                set_bit(flag, win);
-                clr_bit(flag, gamestart);
-            }
-        }
-        /// Colisions
-
-        if (!(tst_bit(flag, vbattery)))
-        {
-            if(random(0, 101) > dropchance)
-            {
-                set_bit(flag, vbattery);
-                energy_position[0] = 12;
-                energy_position[1] = random(0, 2);
-
-            }
-        }
-        else
-        {
-            energy_position[0] -= 1;
-            Draw(energy_position, 4);
-            if (colisionShootAsteroid(ship_position, energy_position) == 1)
-            {
-                clr_bit(flag, vbattery);
-                energy_position[0] = -2;
-                energy_points += 40;
-            }
-        }
-        //delay(velocity); // Game Velocity
+  }
+  else
+  {
+    if (!tst_bit(flag, flag_first))
+    {
+      while(tst_bit(PIND, ShootBT))
+      {
+        initialScreen();
+      }
+      cpl_bit(flag, flag_first);
+      lcd.clear();
+      game_reset();
+      TIMSK1 |= (1 << OCIE1A);
     }
     else
     {
-        if (!tst_bit(flag, flag_first))
+      if (tst_bit(flag, win))
+      {
+ 		
+        TIMSK1 &= (0 << OCIE1A);
+        if(!(tst_bit(flag, flag_up)))
         {
-             while(tst_bit(PIND, ShootBT))
-            {
-                initialScreen();
-            }
-            cpl_bit(flag, flag_first);
-          	lcd.clear();
-            game_reset();
-            TIMSK1 |= (1 << OCIE1A);
+          velocity -= 500;
+          recpoints -= 10;
+          dropchance += 10;
+          points_to_win += 2;
         }
-        else
-        {
-            if (tst_bit(flag, win))
-            {
-                velocity -= 50;
-                recpoints -= 10;
-                dropchance += 10; 
-                energy_points = 70;
-               	finalScreen("You win");
-            }
-            else
-            {
-              	velocity = 300;
-                recpoints = 40 ;
-                dropchance = 50; 
-                energy_points = 100;
-                finalScreen("You Lse");
-            }
-        }
-
-        if(!(tst_bit(PIND, ShootBT)))
-        {
-            game_reset();
-        }
+        energy_points = 70;
+        finalScreen("You win");
+        set_bit(flag, flag_up);
+      }
+      else
+      {
+        TIMSK1 &= (0 << OCIE1A);
+        recpoints = 40 ;
+        velocity = 5000;
+        dropchance = 50;
+        points_to_win = 2;
+        energy_points = 100;
+        finalScreen("You Lse");
+      }
     }
 
+    if(!(tst_bit(PIND, ShootBT)))
+    {
+      TIMSK1 |= (1 << OCIE1A);
+      OCR1A = velocity;
+      game_reset();
+    }
+  }
 }
 
 ///! Draw Objects of Game in Screen.
@@ -288,8 +328,6 @@ void animationExplosion(int position[2])
 {
     lcd.setCursor(position[0], position[1]);
     lcd.write(3);
-    delay(1000);
-    lcd.clear();
 }
 
 ///! Change Game States for restart.
@@ -300,13 +338,14 @@ void animationExplosion(int position[2])
 */
 void game_reset() 
 {
-    ship_position[0] = 0; 
-    ship_position[1] = 0;
-    asteroid_position[0] = 12;
-    asteroid_position[1] = random(0, 2);
-    points = 0;
-  	set_bit(flag, gamestart);
-  	clr_bit(flag, win);
+  ship_position[0] = 0; 
+  ship_position[1] = 0;
+  asteroid_position[0] = 12;
+  asteroid_position[1] = random(0, 2);
+  points = 0;
+  set_bit(flag, gamestart);
+  clr_bit(flag, win);
+  clr_bit(flag, flag_up);
     
 }
 
@@ -360,7 +399,7 @@ void initialScreen()
 /*!
     \param position_ob1 array of position with 2 values.
     \param position_ob2 array of position with 2 values.
-    \return one interger with value 1.
+    \return one interger with value 1 or zero interger with value 0.
 */
 int colisionShootAsteroid (int position_ob1[2], int position_ob2[2])
 {
@@ -368,14 +407,17 @@ int colisionShootAsteroid (int position_ob1[2], int position_ob2[2])
     {
         return 1;
     }
-   
+    else
+    {
+      	return 0;
+    }
 }
 
 ///! Create Colision Ship With Asteroid.
 /*!
     \param position_ob1 array of position with 2 values.
     \param position_ob2 array of position with 2 values.
-    \return one interger with value 1.
+    \return one interger with value 1 or zero interger with value 0.
 */
 int colisionShipAsteroid(int position_ob1[2], int position_ob2[2])
 {
@@ -383,4 +425,8 @@ int colisionShipAsteroid(int position_ob1[2], int position_ob2[2])
     {
         return 1;
     }
-}   
+  	else
+  	{
+      return 0;
+  	}
+}  
