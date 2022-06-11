@@ -1,8 +1,9 @@
 //! Archive Description.
 /*!
 * \author Matheus Barbi. M.
+  \author Rodri Jost. 
 * \since 26/02/2022
-* \version 1.35
+* \version 2.0
 */
 
 #include <LiquidCrystal.h>
@@ -70,7 +71,7 @@ LiquidCrystal lcd (13, 12, 11, 10, 9, 8);
 ISR(INT0_vect)
 {
   cpl_bit(flag, pause);
-  TIMSK1 |= (1 << OCIE1A);
+  set_bit(TIMSK1, OCIE1A);
   
 }
 
@@ -86,7 +87,7 @@ ISR(TIMER1_COMPA_vect)
   lcd.clear(); 
   if(tst_bit(flag, pause))
   {
-    TIMSK1 &= (0 << OCIE1A);
+    clr_bit(TIMSK1, OCIE1A);
    	lcd.setCursor(0, 0);
     lcd.print("GAME PAUSED");
     lcd.setCursor(0, 1);
@@ -108,6 +109,7 @@ ISR(TIMER1_COMPA_vect)
     if (tst_bit(flag, vshoot))
     {
       Draw(shoot_position, 5);	
+      shoot_position[0] += 1;		
     }
     
     asteroid_position[0] -= 1;
@@ -268,14 +270,14 @@ void loop()
       cpl_bit(flag, flag_first);
       lcd.clear();
       game_reset();
-      TIMSK1 |= (1 << OCIE1A);
+      set_bit(TIMSK1, OCIE1A);
     }
     else
     {
       if (tst_bit(flag, win))
       {
  		
-        TIMSK1 &= (0 << OCIE1A);
+        clr_bit(TIMSK1, OCIE1A);
         if(!(tst_bit(flag, flag_up)))
         {
           velocity -= 500;
@@ -289,7 +291,7 @@ void loop()
       }
       else
       {
-        TIMSK1 &= (0 << OCIE1A);
+        clr_bit(TIMSK1, OCIE1A);
         recpoints = 40 ;
         velocity = 5000;
         dropchance = 50;
@@ -301,7 +303,7 @@ void loop()
 
     if(!(tst_bit(PIND, ShootBT)))
     {
-      TIMSK1 |= (1 << OCIE1A);
+      set_bit(TIMSK1, OCIE1A);
       OCR1A = velocity;
       game_reset();
     }
