@@ -108,16 +108,11 @@ ISR(TIMER1_COMPA_vect)
     }
     if (tst_bit(flag, vshoot))
     {
-      Draw(shoot_position, 5);	
+      Draw(shoot_position, 5);
       shoot_position[0] += 1;		
     }
     
     asteroid_position[0] -= 1;
-    
-    if (tst_bit(flag, vshoot))
-    {
-      shoot_position[0] += 1;	
-    }
     
     if (colisionShipAsteroid(ship_position, asteroid_position))
     { 
@@ -164,7 +159,6 @@ void setup()
   // Configura REGS do PORTD como saída ou entrada. 1 -> OUT, 0-> IN
   DDRD = 0b00000011; 
   PORTD =0b11111100; // Habilita Resistores de Pull-Down Interno
-
   
   ///! Configuração dos Registradores para Interrupção.
   /*!
@@ -348,7 +342,6 @@ void game_reset()
   set_bit(flag, gamestart);
   clr_bit(flag, win);
   clr_bit(flag, flag_up);
-    
 }
 
 ///! Creates Painel Of Game.
